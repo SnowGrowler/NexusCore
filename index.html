@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nexus AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep:    #020608;
+      --bg-mid:     #060d14;
+      --bg-card:    #081118;
+      --bg-input:   #0a1520;
+      --blue-core:  #00aaff;
+      --blue-glow:  #0066cc;
+      --blue-dim:   #003d6e;
+      --blue-pale:  #c0e8ff;
+      --cyan:       #00e5ff;
+      --grid-line:  rgba(0,170,255,0.06);
+      --border:     rgba(0,170,255,0.18);
+      --text-main:  #d0eeff;
+      --text-muted: #4a7a99;
+      --text-dim:   #1e4060;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-deep);
+      color: var(--text-main);
+      font-family: 'IBM Plex Mono', monospace;
+      overflow: hidden;
+    }
+
+    /* ── Animated grid background ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridPulse 8s ease-in-out infinite;
+    }
+    @keyframes gridPulse {
+      0%,100% { opacity:.6 }
+      50%      { opacity:1 }
+    }
+
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,100,200,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ── Layout ── */
+    #app {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column;
+      height: 100vh; max-width: 860px;
+      margin: 0 auto;
+      padding: 0 12px;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 4px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-group {
+      display: flex; align-items: center; gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px; height: 40px;
+      position: relative; flex-shrink: 0;
+    }
+    .logo-icon svg { width:100%; height:100%; }
+
+    .logo-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.35rem; font-weight: 800;
+      letter-spacing: .08em;
+      background: linear-gradient(90deg, var(--cyan), var(--blue-core));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+    }
+    .logo-sub {
+      font-size: .6rem; letter-spacing: .22em;
+      color: var(--text-muted); text-transform: uppercase;
+      margin-top: -2px;
+    }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .65rem; letter-spacing: .15em;
+      color: var(--blue-core);
+      background: rgba(0,170,255,0.06);
+      border: 1px solid rgba(0,170,255,0.2);
+      padding: 5px 12px; border-radius: 20px;
+    }
+    .pulse-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan);
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%,100%{ opacity:1 } 50%{ opacity:.3 }
+    }
+
+    /* ── API Key Gate ── */
+    #gate {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px; padding: 24px;
+      text-align: center;
+    }
+    #gate h2 {
+      font-family: 'Orbitron', sans-serif; font-size: 1rem;
+      color: var(--blue-core); letter-spacing: .1em;
+    }
+    #gate p {
+      font-size: .75rem; color: var(--text-muted);
+      max-width: 420px; line-height: 1.7;
+    }
+    #gate a { color: var(--blue-core); text-decoration: none; }
+    #gate a:hover { text-decoration: underline; }
+
+    .gate-input-wrap {
+      display: flex; gap: 8px; width: 100%; max-width: 460px;
+    }
+    .gate-input-wrap input {
+      flex: 1; background: var(--bg-input);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 14px; font-family: 'IBM Plex Mono', monospace;
+      font-size: .8rem; color: var(--text-main);
+      outline: none; transition: border-color .2s;
+    }
+    .gate-input-wrap input:focus { border-color: var(--blue-core); }
+    .gate-input-wrap input::placeholder { color: var(--text-dim); }
+
+    /* ── Chat area ── */
+    #chat-wrap { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    #chat-wrap.active { display: flex; }
+
+    #messages {
+      flex: 1; overflow-y: auto; padding: 20px 4px;
+      display: flex; flex-direction: column; gap: 16px;
+      scroll-behavior: smooth;
+    }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: var(--blue-dim); border-radius: 4px; }
+
+    /* ── Messages ── */
+    .msg {
+      display: flex; gap: 12px; align-items: flex-start;
+      animation: fadeUp .3s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(10px) }
+      to   { opacity:1; transform:translateY(0) }
+    }
+
+    .msg.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 32px; height: 32px; border-radius: 6px;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      font-size: .7rem; font-weight: 600;
+    }
+    .avatar.ai {
+      background: linear-gradient(135deg, #001a33, #003366);
+      border: 1px solid var(--blue-dim);
+      color: var(--blue-core);
+      font-family: 'Orbitron', sans-serif; font-size: .55rem; letter-spacing: .05em;
+    }
+    .avatar.user-av {
+      background: linear-gradient(135deg, #001428, #002244);
+      border: 1px solid rgba(0,170,255,0.3);
+      color: var(--text-muted);
+    }
+
+    .bubble {
+      max-width: 78%; padding: 12px 16px;
+      border-radius: 10px; font-size: .82rem; line-height: 1.7;
+    }
+    .msg.ai .bubble {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-top-left-radius: 2px;
+      color: var(--text-main);
+    }
+    .msg.user .bubble {
+      background: linear-gradient(135deg, #001e3c, #003060);
+      border: 1px solid rgba(0,170,255,0.25);
+      border-top-right-radius: 2px;
+      color: var(--blue-pale);
+    }
+
+    /* code blocks inside AI replies */
+    .bubble pre {
+      background: #020f1a; border: 1px solid var(--blue-dim);
+      border-radius: 6px; padding: 10px 12px;
+      margin: 8px 0; overflow-x: auto;
+      font-size: .75rem; line-height: 1.5;
+    }
+    .bubble code { color: var(--cyan); font-family: 'IBM Plex Mono', monospace; }
+    .bubble strong { color: var(--blue-core); }
+    .bubble em { color: var(--text-muted); }
+
+    /* typing indicator */
+    .typing-dots span {
+      display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--blue-core);
+      margin: 0 2px;
+      animation: dot 1.2s ease-in-out infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes dot {
+      0%,80%,100%{ transform:scale(.7); opacity:.4 }
+      40%        { transform:scale(1.1); opacity:1 }
+    }
+
+    /* ── Input bar ── */
+    #input-bar {
+      padding: 12px 4px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .input-row {
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+
+    #user-input {
+      flex: 1; min-height: 44px; max-height: 140px;
+      background: var(--bg-input);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 11px 14px; resize: none;
+      font-family: 'IBM Plex Mono', monospace; font-size: .82rem;
+      color: var(--text-main); outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      line-height: 1.5; overflow-y: auto;
+    }
+    #user-input:focus {
+      border-color: var(--blue-core);
+      box-shadow: 0 0 0 3px rgba(0,170,255,0.08);
+    }
+    #user-input::placeholder { color: var(--text-dim); }
+
+    #send-btn {
+      width: 44px; height: 44px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--blue-glow), var(--blue-core));
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .15s, box-shadow .2s;
+      box-shadow: 0 0 14px rgba(0,170,255,0.3);
+    }
+    #send-btn:hover { transform: scale(1.06); box-shadow: 0 0 22px rgba(0,170,255,0.55); }
+    #send-btn:active { transform: scale(.97); }
+    #send-btn svg { width: 18px; height: 18px; fill: #fff; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue-glow), var(--blue-core));
+      border: none; color: #fff; padding: 10px 24px;
+      border-radius: 6px; cursor: pointer; font-family: 'Orbitron', sans-serif;
+      font-size: .72rem; letter-spacing: .08em; font-weight: 600;
+      transition: box-shadow .2s, transform .15s;
+      box-shadow: 0 0 14px rgba(0,170,255,0.3);
+    }
+    .btn-primary:hover { box-shadow: 0 0 24px rgba(0,170,255,0.6); transform: scale(1.03); }
+
+    /* footer hint */
+    .input-hint {
+      font-size: .6rem; color: var(--text-dim);
+      margin-top: 6px; padding: 0 2px;
+      display: flex; justify-content: space-between;
+    }
+
+    /* model tag */
+    .model-tag {
+      font-size: .6rem; color: var(--text-dim);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .model-tag span { color: var(--blue-core); }
+
+    /* ── Scan line overlay ── */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 999;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* welcome hints */
+    .welcome {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; flex: 1; gap: 24px; padding: 20px;
+      text-align: center;
+    }
+    .welcome-logo {
+      font-family: 'Orbitron', sans-serif; font-size: 2rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--cyan), var(--blue-core));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 16px rgba(0,230,255,0.3));
+    }
+    .welcome p {
+      font-size: .78rem; color: var(--text-muted); max-width: 380px; line-height: 1.8;
+    }
+    .chips {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+      max-width: 500px;
+    }
+    .chip {
+      background: rgba(0,170,255,0.06);
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 7px 14px; font-size: .7rem;
+      color: var(--text-muted); cursor: pointer;
+      transition: background .2s, color .2s, border-color .2s;
+    }
+    .chip:hover {
+      background: rgba(0,170,255,0.14);
+      border-color: var(--blue-core); color: var(--blue-core);
+    }
+
+    @media (max-width: 500px) {
+      .logo-text { font-size: 1.05rem; }
+      .bubble { max-width: 88%; font-size: .78rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<div id="app">
+  <!-- HEADER -->
+  <header>
+    <div class="logo-group">
+      <div class="logo-icon">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" stroke="#00aaff" stroke-width="1.2" stroke-dasharray="4 2" opacity=".4"/>
+          <circle cx="20" cy="20" r="12" stroke="#00aaff" stroke-width="1" opacity=".7"/>
+          <circle cx="20" cy="20" r="5" fill="#00aaff" opacity=".9"/>
+          <circle cx="20" cy="20" r="3" fill="#00e5ff"/>
+          <line x1="20" y1="2" x2="20" y2="8" stroke="#00aaff" stroke-width="1.5"/>
+          <line x1="20" y1="32" x2="20" y2="38" stroke="#00aaff" stroke-width="1.5"/>
+          <line x1="2" y1="20" x2="8" y2="20" stroke="#00aaff" stroke-width="1.5"/>
+          <line x1="32" y1="20" x2="38" y2="20" stroke="#00aaff" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">NEXUS AI</div>
+        <div class="logo-sub">Intelligent Interface v2.0</div>
+      </div>
+    </div>
+    <div class="status-pill">
+      <div class="pulse-dot"></div>
+      ONLINE
+    </div>
+  </header>
+
+  <!-- API KEY GATE -->
+  <div id="gate">
+    <h2>// INITIALIZE CONNECTION</h2>
+    <p>
+      API powered by OpenRouter. Enter your key to begin —
+      get a free one at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> (no card required).
+    </p>
+    <div class="gate-input-wrap">
+      <input type="password" id="api-key-input" placeholder="Paste your Gemini API key..." />
+      <button class="btn-primary" onclick="initChat()">CONNECT</button>
+    </div>
+    <p style="font-size:.62rem;color:var(--text-dim);">Your key is stored only in memory and never sent anywhere except OpenRouter's API.</p>
+  </div>
+
+  <!-- CHAT WRAP -->
+  <div id="chat-wrap">
+    <div id="messages">
+      <!-- welcome shown here until first message -->
+      <div class="welcome" id="welcome-screen">
+        <div class="welcome-logo">NEXUS AI</div>
+        <p>I'm connected to OpenRouter with access to powerful free AI models. Ask me anything.</p>
+        <div class="chips">
+          <div class="chip" onclick="sendChip(this)">What's happening in tech today?</div>
+          <div class="chip" onclick="sendChip(this)">Explain quantum computing simply</div>
+          <div class="chip" onclick="sendChip(this)">Write a Python web scraper</div>
+          <div class="chip" onclick="sendChip(this)">Latest AI model releases?</div>
+          <div class="chip" onclick="sendChip(this)">Help me debug my code</div>
+          <div class="chip" onclick="sendChip(this)">Best practices for React in 2025</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="input-bar">
+      <div class="input-row">
+        <textarea id="user-input" rows="1" placeholder="Send a message to Nexus AI..."></textarea>
+        <button id="send-btn" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">
+        <span>↵ Enter to send &nbsp;·&nbsp; Shift+↵ for new line</span>
+        <span class="model-tag">Powered by <span>OpenRouter · Llama 4 Scout</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let API_KEY = '';
+  let conversationHistory = [];
+
+  // ── Init ─────────────────────────────────────────────────────────────
+  function initChat() {
+    const k = document.getElementById('api-key-input').value.trim();
+    if (!k) { shake(document.getElementById('api-key-input')); return; }
+    API_KEY = k;
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('chat-wrap').classList.add('active');
+    document.getElementById('user-input').focus();
+  }
+
+  document.getElementById('api-key-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') initChat();
+  });
+
+  function shake(el) {
+    el.style.animation = 'none';
+    el.offsetHeight;
+    el.style.animation = 'shake .3s ease';
+    el.style.borderColor = '#ff4455';
+    setTimeout(() => { el.style.borderColor = ''; }, 800);
+  }
+
+  // ── Textarea auto-resize ──────────────────────────────────────────────
+  const textarea = document.getElementById('user-input');
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
+  });
+  textarea.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  // ── Chip shortcuts ────────────────────────────────────────────────────
+  function sendChip(el) {
+    textarea.value = el.textContent;
+    sendMessage();
+  }
+
+  // ── Send message ──────────────────────────────────────────────────────
+  async function sendMessage() {
+    const text = textarea.value.trim();
+    if (!text || !API_KEY) return;
+
+    hideWelcome();
+    textarea.value = '';
+    textarea.style.height = 'auto';
+
+    appendMessage('user', escapeHtml(text));
+    conversationHistory.push({ role: 'user', content: text });
+
+    const typingId = appendTyping();
+
+    try {
+      const reply = await callOpenRouter(conversationHistory);
+      removeTyping(typingId);
+      appendMessage('ai', formatReply(reply));
+      conversationHistory.push({ role: 'assistant', content: reply });
+    } catch (err) {
+      removeTyping(typingId);
+      appendMessage('ai', `<span style="color:#ff4455">⚠ Error: ${escapeHtml(err.message)}</span>`);
+    }
+  }
+
+  // ── OpenRouter API call ───────────────────────────────────────────────
+  async function callOpenRouter(history) {
+    const systemPrompt = {
+      role: 'system',
+      content: `You are Nexus AI — a sharp, knowledgeable AI assistant with a sleek, technical personality.
+Be concise yet thorough. Format code in markdown code blocks.
+Use bold for key terms. Keep your tone professional but approachable.
+Today's date: ${new Date().toDateString()}.`
+    };
+
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`,
+        'HTTP-Referer': window.location.href,
+        'X-Title': 'Nexus AI'
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout:free',
+        messages: [systemPrompt, ...history],
+        temperature: 0.85,
+        max_tokens: 2048,
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content;
+    if (!reply) throw new Error('No response from OpenRouter.');
+    return reply;
+  }
+
+  // ── DOM helpers ───────────────────────────────────────────────────────
+  function hideWelcome() {
+    const w = document.getElementById('welcome-screen');
+    if (w) w.remove();
+  }
+
+  function appendMessage(role, html) {
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+
+    const avatarHtml = role === 'ai'
+      ? `<div class="avatar ai">NX</div>`
+      : `<div class="avatar user-av"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`;
+
+    div.innerHTML = `${avatarHtml}<div class="bubble">${html}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+  }
+
+  function appendTyping() {
+    const id = 'typing-' + Date.now();
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'msg ai'; div.id = id;
+    div.innerHTML = `<div class="avatar ai">NX</div><div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return id;
+  }
+
+  function removeTyping(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  // ── Formatting ────────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function formatReply(text) {
+    // code blocks
+    text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+      `<pre><code>${escapeHtml(code.trim())}</code></pre>`
+    );
+    // inline code
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // bold
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // italic
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // headers
+    text = text.replace(/^### (.+)$/gm, '<strong style="color:var(--cyan);font-size:.85rem">$1</strong>');
+    text = text.replace(/^## (.+)$/gm,  '<strong style="color:var(--blue-core);font-size:.9rem">$1</strong>');
+    text = text.replace(/^# (.+)$/gm,   '<strong style="color:var(--cyan);font-size:.95rem">$1</strong>');
+    // bullet lists
+    text = text.replace(/^[•\-\*] (.+)$/gm, '· $1');
+    // numbered lists
+    text = text.replace(/^\d+\. (.+)$/gm, '→ $1');
+    // line breaks
+    text = text.replace(/\n/g, '<br>');
+    return text;
+  }
+
+  // ── Shake keyframe (injected) ─────────────────────────────────────────
+  const style = document.createElement('style');
+  style.textContent = `@keyframes shake {
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)}
+  }`;
+  document.head.appendChild(style);
+</script>
+</body>
+</html>
